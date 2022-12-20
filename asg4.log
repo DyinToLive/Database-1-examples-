@@ -1,0 +1,521 @@
+Database changed
+--------------
+DROP TABLE IF EXISTS readbook
+--------------
+
+Query OK, 0 rows affected (0.008 sec)
+
+--------------
+DROP TABLE IF EXISTS bookauthor
+--------------
+
+Query OK, 0 rows affected (0.006 sec)
+
+--------------
+DROP TABLE IF EXISTS author
+--------------
+
+Query OK, 0 rows affected (0.006 sec)
+
+--------------
+DROP TABLE IF EXISTS book
+--------------
+
+Query OK, 0 rows affected (0.005 sec)
+
+--------------
+DROP TABLE IF EXISTS user
+--------------
+
+Query OK, 0 rows affected (0.006 sec)
+
+--------------
+CREATE TABLE IF NOT EXISTS user (
+       email VARCHAR(25) PRIMARY KEY CHECK(email like '%_@__%.__%'),
+       dateAdded DATE NOT NULL DEFAULT (NOW()),
+       nickName VARCHAR(25),
+       profile VARCHAR(25))
+       ENGINE=InnoDB
+--------------
+
+Query OK, 0 rows affected (0.008 sec)
+
+--------------
+CREATE TABLE IF NOT EXISTS book (
+       bookID INT PRIMARY KEY AUTO_INCREMENT,
+       title VARCHAR(25) UNIQUE NOT NULL,
+       year INT NOT NULL,
+       numRaters INT DEFAULT 0,
+       rating decimal(3,1) DEFAULT NULL)
+       ENGINE=InnoDB
+--------------
+
+Query OK, 0 rows affected (0.008 sec)
+
+--------------
+CREATE TABLE IF NOT EXISTS readbook (
+       bookID INT NOT NULL,
+       email VARCHAR(25) NOT NULL,
+       dateRead DATE NOT NULL DEFAULT (NOW()),
+       rating INT check(rating between 1 and 10),
+       CONSTRAINT readbook_pk PRIMARY KEY (email, bookID),      
+       CONSTRAINT email_fk FOREIGN KEY (email)
+       REFERENCES user(email),
+       CONSTRAINT book_pk FOREIGN KEY (bookID)
+       REFERENCES book(bookID)
+       )ENGINE=InnoDB
+--------------
+
+Query OK, 0 rows affected, 1 warning (0.009 sec)
+
+--------------
+CREATE TABLE IF NOT EXISTS author (
+       authorID INT PRIMARY KEY AUTO_INCREMENT,
+       lastName VARCHAR(25),
+       firstName VARCHAR(25) UNIQUE NOT NULL,
+       middleName VARCHAR(25),
+       DOB DATE)
+       ENGINE=InnoDB
+--------------
+
+Query OK, 0 rows affected (0.008 sec)
+
+--------------
+CREATE TABLE IF NOT EXISTS bookauthor (
+       authorID INT,
+       bookID INT,
+       CONSTRAINT bookauthor_pk PRIMARY KEY(authorID, bookID),
+       CONSTRAINT author_fk FOREIGN KEY (authorID)
+       REFERENCES author(authorID),
+       CONSTRAINT bookauth_pk FOREIGN KEY (bookID)
+       REFERENCES book(bookID))
+       ENGINE=InnoDB
+--------------
+
+Query OK, 0 rows affected, 1 warning (0.009 sec)
+
+--------------
+DROP TRIGGER IF EXISTS deleteUser_ADR
+--------------
+
+Query OK, 0 rows affected, 1 warning (0.000 sec)
+
+--------------
+CREATE TRIGGER deleteUser_ADR
+AFTER DELETE
+ON user
+FOR EACH ROW
+BEGIN
+	DELETE FROM readbook WHERE email = old.email;
+END
+--------------
+
+Query OK, 0 rows affected (0.003 sec)
+
+--------------
+DROP TRIGGER IF EXISTS deleteReadbookRaters_ADR
+--------------
+
+Query OK, 0 rows affected, 1 warning (0.000 sec)
+
+--------------
+CREATE TRIGGER deleteReadbookRaters_ADR
+AFTER DELETE
+ON readbook
+FOR EACH ROW
+BEGIN
+	UPDATE book SET numRaters = (SELECT COUNT(*)
+	FROM readbook WHERE bookID = old.bookID)
+	WHERE bookID = old.bookID;
+END
+--------------
+
+Query OK, 0 rows affected (0.003 sec)
+
+--------------
+DROP TRIGGER IF EXISTS deleteReadbookRatings_ADR
+--------------
+
+Query OK, 0 rows affected, 1 warning (0.000 sec)
+
+--------------
+CREATE TRIGGER deleteReadbookRatings_ADR
+AFTER DELETE
+ON readbook
+FOR EACH ROW
+BEGIN
+	UPDATE book SET rating = (SELECT AVG(rating)
+	FROM readbook WHERE bookID = old.bookID)
+	WHERE bookID = old.bookID;
+END
+--------------
+
+Query OK, 0 rows affected (0.003 sec)
+
+--------------
+DROP TRIGGER IF EXISTS numRating_AIR
+--------------
+
+Query OK, 0 rows affected, 1 warning (0.000 sec)
+
+--------------
+CREATE TRIGGER numRating_AIR
+AFTER INSERT
+ON readbook
+FOR EACH ROW
+BEGIN
+	UPDATE book SET book.numRaters = (SELECT COUNT(*)
+	FROM readbook WHERE bookID = new.bookID)
+	WHERE bookID = new.bookID;
+END
+--------------
+
+Query OK, 0 rows affected (0.003 sec)
+
+--------------
+DROP TRIGGER IF EXISTS avgRatingInsert_AIR
+--------------
+
+Query OK, 0 rows affected, 1 warning (0.000 sec)
+
+--------------
+CREATE TRIGGER avgRatingInsert_AIR
+AFTER INSERT
+ON readbook
+FOR EACH ROW
+BEGIN
+	UPDATE book SET rating = (SELECT AVG(rating)
+	FROM readbook WHERE bookID = new.bookID)
+	WHERE bookID = new.bookID;
+END
+--------------
+
+Query OK, 0 rows affected (0.003 sec)
+
+--------------
+DROP TRIGGER IF EXISTS numRatingUpdate_AUR
+--------------
+
+Query OK, 0 rows affected, 1 warning (0.000 sec)
+
+--------------
+CREATE TRIGGER numRatingUpdate_AUR
+AFTER UPDATE
+ON readbook
+FOR EACH ROW
+BEGIN
+	UPDATE book SET rating = (SELECT COUNT(*)
+	FROM readbook WHERE bookID = new.bookID)
+	WHERE bookID = new.bookID;
+END
+--------------
+
+Query OK, 0 rows affected (0.003 sec)
+
+--------------
+DROP TRIGGER IF EXISTS avgRatingUpdate_AUR
+--------------
+
+Query OK, 0 rows affected, 1 warning (0.000 sec)
+
+--------------
+CREATE TRIGGER avgRatingUpdate_AUR
+AFTER UPDATE
+ON readbook
+FOR EACH ROW
+BEGIN
+	UPDATE book SET rating = (SELECT AVG(rating)
+	FROM readbook WHERE bookID = new.bookID)
+	WHERE bookID = new.bookID;
+END
+--------------
+
+Query OK, 0 rows affected (0.003 sec)
+
+--------------
+DROP TRIGGER IF EXISTS BeforeUpdateUser_BUR
+--------------
+
+Query OK, 0 rows affected, 1 warning (0.000 sec)
+
+--------------
+CREATE TRIGGER BeforeUpdateUser_BUR
+BEFORE UPDATE
+ON user
+FOR EACH ROW
+BEGIN
+	IF(old.email <> new.email) OR (old.dateAdded <> new.dateAdded)
+	THEN SIGNAL SQLSTATE '45000'
+	SET MESSAGE_TEXT = 'Unable to update email or date added';
+	END IF;
+END
+--------------
+
+Query OK, 0 rows affected (0.003 sec)
+
+--------------
+DROP TRIGGER IF EXISTS BeforeDeleteUser_ADR
+--------------
+
+Query OK, 0 rows affected, 1 warning (0.000 sec)
+
+--------------
+CREATE TRIGGER BeforeDeleteUser_ADR
+AFTER DELETE
+ON user
+FOR EACH ROW
+BEGIN
+	DELETE FROM readbook WHERE email = old.email;
+END
+--------------
+
+Query OK, 0 rows affected (0.003 sec)
+
+MariaDB [jwats569]> \. BookClubData.sql
+Database changed
+--------------
+INSERT INTO user (email, nickName, profile)
+VALUES('jwats569@mtroyal.ca', 'John', 'ahhhh')
+--------------
+
+Query OK, 1 row affected, 1 warning (0.003 sec)
+
+--------------
+INSERT INTO user (email, nickName, profile)
+VALUES('straw569@mtroyal.ca', 'Cena', 'ahhhhhhh')
+--------------
+
+Query OK, 1 row affected, 1 warning (0.002 sec)
+
+--------------
+INSERT INTO user (email, nickName, profile)
+VALUES('claw569@mtroyal.ca', 'Wick', 'ahhhhhhh')
+--------------
+
+Query OK, 1 row affected, 1 warning (0.004 sec)
+
+--------------
+INSERT INTO user (email, nickName, profile)
+VALUES('nawhhh569@mtroyal.ca', 'Jones', 'ahhhhhhh')
+--------------
+
+Query OK, 1 row affected, 1 warning (0.001 sec)
+
+--------------
+INSERT INTO user (email, nickName, profile)
+VALUES('claw569@mtroyal.ca', 'Wick', 'ahhhhhhh')
+--------------
+
+ERROR 1062 (23000): Duplicate entry 'claw569@mtroyal.ca' for key 'PRIMARY'
+--------------
+INSERT INTO user (email, nickName, profile)
+VALUES('claw569', 'Wick', 'ahhhhhhh')
+--------------
+
+ERROR 4025 (23000): CONSTRAINT `user.email` failed for `jwats569`.`user`
+--------------
+INSERT INTO user (email, nickName, profile)
+VALUES('claw569@mtroyal.ca', 'Wick', 'ahhhhhhh')
+--------------
+
+ERROR 1062 (23000): Duplicate entry 'claw569@mtroyal.ca' for key 'PRIMARY'
+--------------
+INSERT INTO user (email, nickName, profile)
+VALUES('claw569mtroyalca', 'Warning', 'ahhhhhhh')
+--------------
+
+ERROR 4025 (23000): CONSTRAINT `user.email` failed for `jwats569`.`user`
+--------------
+INSERT INTO user (email, nickName, profile)
+VALUES('rawr569@mtroyal.ca', 'Wick', 'ahhhhhhhhhhhhhhhhhhhhhhhhhhhh
+hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh')
+--------------
+
+ERROR 1406 (22001): Data too long for column 'profile' at row 1
+--------------
+INSERT INTO book(title, year)
+VALUES ("Harry Potter", 1970),
+("Fantastic Beasts", 1980),
+("LOTR", 1990)
+--------------
+
+Query OK, 3 rows affected (0.001 sec)
+Records: 3  Duplicates: 0  Warnings: 0
+
+--------------
+INSERT INTO readbook(bookID, email, rating)
+VALUES(1,'jwats569@mtroyal.ca',8)
+--------------
+
+Query OK, 1 row affected, 1 warning (0.004 sec)
+
+--------------
+INSERT INTO readbook(bookID, email, rating)
+VALUES(1,'claw569@mtroyal.ca',4)
+--------------
+
+Query OK, 1 row affected, 1 warning (0.002 sec)
+
+--------------
+INSERT INTO readbook(bookID, email, rating)
+VALUES(2,'jwats569@mtroyal.ca',4)
+--------------
+
+Query OK, 1 row affected, 1 warning (0.003 sec)
+
+--------------
+INSERT INTO author(firstName)
+VALUES("JK rollin")
+--------------
+
+Query OK, 1 row affected (0.001 sec)
+
+--------------
+INSERT INTO author(firstName)
+VALUES("JK rolling")
+--------------
+
+Query OK, 1 row affected (0.001 sec)
+
+--------------
+INSERT INTO author(firstName)
+VALUES("Author3")
+--------------
+
+Query OK, 1 row affected (0.003 sec)
+
+--------------
+INSERT INTO author(firstName)
+VALUES("Author4")
+--------------
+
+Query OK, 1 row affected (0.001 sec)
+
+--------------
+INSERT INTO bookauthor(authorID, bookID)
+VALUES(1,1)
+--------------
+
+Query OK, 1 row affected (0.001 sec)
+
+--------------
+INSERT INTO bookauthor(authorID, bookID)
+VALUES(2,1)
+--------------
+
+Query OK, 1 row affected (0.001 sec)
+
+--------------
+INSERT INTO bookauthor(authorID, bookID)
+VALUES(3,2)
+--------------
+
+Query OK, 1 row affected (0.003 sec)
+
+--------------
+INSERT INTO bookauthor(authorID, bookID)
+VALUES(4,3)
+--------------
+
+Query OK, 1 row affected (0.001 sec)
+
+--------------
+DROP VIEW IF EXISTS bookSearch
+--------------
+
+Query OK, 0 rows affected (0.000 sec)
+
+--------------
+CREATE VIEW IF NOT EXISTS bookSearch AS
+SELECT book.title, author.firstName FROM book
+JOIN bookauthor USING (bookID)
+JOIN author USING (authorID)
+WHERE book.title = "Harry Potter"
+--------------
+
+Query OK, 0 rows affected (0.002 sec)
+
+--------------
+SELECT * FROM bookSearch
+--------------
+
++--------------+------------+
+| title        | firstName  |
++--------------+------------+
+| Harry Potter | JK rollin  |
+| Harry Potter | JK rolling |
++--------------+------------+
+2 rows in set (0.000 sec)
+
+--------------
+DROP VIEW IF EXISTS ratingSearch
+--------------
+
+Query OK, 0 rows affected (0.000 sec)
+
+--------------
+CREATE VIEW IF NOT EXISTS ratingSearch AS
+SELECT book.title, book.numRaters, book.rating
+FROM book
+--------------
+
+Query OK, 0 rows affected (0.001 sec)
+
+--------------
+SELECT * FROM ratingSearch
+--------------
+
++------------------+-----------+--------+
+| title            | numRaters | rating |
++------------------+-----------+--------+
+| Harry Potter     |         2 |    6.0 |
+| Fantastic Beasts |         1 |    4.0 |
+| LOTR             |         0 |   NULL |
++------------------+-----------+--------+
+3 rows in set (0.000 sec)
+
+--------------
+SELECT * FROM readbook
+--------------
+
++--------+---------------------+------------+--------+
+| bookID | email               | dateRead   | rating |
++--------+---------------------+------------+--------+
+|      1 | claw569@mtroyal.ca  | 2021-12-08 |      4 |
+|      1 | jwats569@mtroyal.ca | 2021-12-08 |      8 |
+|      2 | jwats569@mtroyal.ca | 2021-12-08 |      4 |
++--------+---------------------+------------+--------+
+3 rows in set (0.000 sec)
+
+--------------
+DELETE FROM readbook WHERE email = 'claw569@mtroyal.ca'
+--------------
+
+Query OK, 1 row affected (0.002 sec)
+
+--------------
+SELECT * FROM readbook
+--------------
+
++--------+---------------------+------------+--------+
+| bookID | email               | dateRead   | rating |
++--------+---------------------+------------+--------+
+|      1 | jwats569@mtroyal.ca | 2021-12-08 |      8 |
+|      2 | jwats569@mtroyal.ca | 2021-12-08 |      4 |
++--------+---------------------+------------+--------+
+2 rows in set (0.000 sec)
+
+--------------
+Select * From book
+--------------
+
++--------+------------------+------+-----------+--------+
+| bookID | title            | year | numRaters | rating |
++--------+------------------+------+-----------+--------+
+|      1 | Harry Potter     | 1970 |         1 |    8.0 |
+|      2 | Fantastic Beasts | 1980 |         1 |    4.0 |
+|      3 | LOTR             | 1990 |         0 |   NULL |
++--------+------------------+------+-----------+--------+
+3 rows in set (0.000 sec)
+
